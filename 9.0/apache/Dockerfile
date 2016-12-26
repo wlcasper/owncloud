@@ -1,4 +1,4 @@
-FROM php:5.6-apache
+FROM armv7/armhf-php:5.6-apache
 
 RUN apt-get update && apt-get install -y \
 	bzip2 \
@@ -12,11 +12,12 @@ RUN apt-get update && apt-get install -y \
 	libpng12-dev \
 	libpq-dev \
 	libxml2-dev \
+	ssl-cert \
 	&& rm -rf /var/lib/apt/lists/*
 
 # https://doc.owncloud.org/server/8.1/admin_manual/installation/source_installation.html#prerequisites
 RUN docker-php-ext-configure gd --with-png-dir=/usr --with-jpeg-dir=/usr \
-	&& docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu/ \
+	&& docker-php-ext-configure ldap --with-libdir=lib/arm-linux-gnueabihf/ \
 	&& docker-php-ext-install exif gd intl ldap mbstring mcrypt mysql opcache pdo_mysql pdo_pgsql pgsql zip
 
 # set recommended PHP.ini settings
@@ -30,6 +31,7 @@ RUN { \
 		echo 'opcache.enable_cli=1'; \
 	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
 RUN a2enmod rewrite
+RUN a2enmod ssl
 
 # PECL extensions
 RUN set -ex \
@@ -53,7 +55,11 @@ RUN curl -fsSL -o owncloud.tar.bz2 \
 	&& tar -xjf owncloud.tar.bz2 -C /usr/src/ \
 	&& rm owncloud.tar.bz2
 
+RUN sed '/ErrorLog\|CustomLog/d' /etc/apache2/sites-available/000-default.conf > /etc/apache2/sites-enabled/000-default.conf
+RUN sed '/ErrorLog\|CustomLog/d' /etc/apache2/sites-available/default-ssl.conf > /etc/apache2/sites-enabled/default-ssl.conf
+
 COPY docker-entrypoint.sh /entrypoint.sh
 
+EXPOSE 80 443
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["apache2-foreground"]
